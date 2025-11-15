@@ -50,10 +50,11 @@ exports.getCalendar = async (req, res, next) => {
       start: { $gte: startDate, $lte: endDate }
     }).sort({ start: 1 });
     
-    // Get work units
+    // Get work units (exclude skipped to prevent duplicates)
     const workUnits = await WorkUnit.find({
       userId: req.user._id,
-      scheduledStart: { $gte: startDate, $lte: endDate }
+      scheduledStart: { $gte: startDate, $lte: endDate },
+      status: { $in: ['todo', 'in-progress', 'done'] }
     }).populate('goalId', 'title priority')
       .sort({ scheduledStart: 1 });
     
@@ -115,10 +116,10 @@ exports.importCalendarEvents = async (req, res, next) => {
  */
 exports.regenerateSchedule = async (req, res, next) => {
   try {
-    // Delete all pending work units
+    // Delete all pending and skipped work units
     await WorkUnit.deleteMany({
       userId: req.user._id,
-      status: 'todo'
+      status: { $in: ['todo', 'skipped'] }
     });
     
     // Generate new schedule

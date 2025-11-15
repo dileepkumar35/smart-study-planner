@@ -12,10 +12,6 @@ import {
   Grid,
   IconButton,
   Alert,
-  AppBar,
-  Toolbar,
-  Menu,
-  MenuItem as MenuItemComponent,
   List,
   ListItem,
   ListItemText,
@@ -32,19 +28,17 @@ import {
   Divider
 } from '@mui/material';
 import {
-  ArrowBack,
-  AccountCircle,
   Person,
   CheckCircle,
   Schedule,
   TrendingUp
 } from '@mui/icons-material';
 import { format } from 'date-fns';
+import SharedNavbar from '../components/SharedNavbar';
 
 const MentorView = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [anchorEl, setAnchorEl] = useState(null);
+  const { user } = useAuth();
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentProgress, setStudentProgress] = useState(null);
@@ -82,19 +76,6 @@ const MentorView = () => {
     }
   };
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return 'error';
@@ -114,27 +95,8 @@ const MentorView = () => {
   };
 
   return (
-    <Box>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
-            <ArrowBack />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Mentor/Parent View
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/dashboard')}>
-            Dashboard
-          </Button>
-          <IconButton color="inherit" onClick={handleMenuOpen}>
-            <AccountCircle />
-          </IconButton>
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-            <MenuItemComponent disabled>{user?.name}</MenuItemComponent>
-            <MenuItemComponent onClick={handleLogout}>Logout</MenuItemComponent>
-          </Menu>
-        </Toolbar>
-      </AppBar>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <SharedNavbar />
 
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

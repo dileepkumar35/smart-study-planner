@@ -15,7 +15,16 @@ router.get(
   authenticate,
   [
     query('date').optional().isISO8601(),
-    query('status').optional().isIn(['todo', 'in-progress', 'done', 'skipped', 'overdue'])
+    query('status').optional().custom((value) => {
+      // Allow comma-separated status values
+      const validStatuses = ['todo', 'in-progress', 'done', 'skipped', 'overdue'];
+      const statuses = value.split(',').map(s => s.trim());
+      const allValid = statuses.every(s => validStatuses.includes(s));
+      if (!allValid) {
+        throw new Error('Invalid status value(s)');
+      }
+      return true;
+    })
   ],
   validate,
   workUnitController.getWorkUnits

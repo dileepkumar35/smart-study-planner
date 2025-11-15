@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGoals } from '../context/GoalContext';
+import { ThemeProvider } from '@mui/material/styles';
 import {
   Container,
   Box,
   Typography,
   Button,
-  Card,
-  CardContent,
   Grid,
   Dialog,
   DialogTitle,
@@ -23,28 +22,35 @@ import {
   Chip,
   LinearProgress,
   Alert,
-  AppBar,
-  Toolbar,
-  Menu,
-  MenuItem as MenuItemComponent
+  InputAdornment
 } from '@mui/material';
 import {
   Add,
   Edit,
   Delete,
-  ArrowBack,
-  AccountCircle,
-  Flag
+  Flag,
+  AssignmentTurnedIn,
+  CalendarToday
 } from '@mui/icons-material';
+import SharedNavbar from '../components/SharedNavbar';
 import { format } from 'date-fns';
+import {
+  sspTheme,
+  GradientBox,
+  StyledPaper,
+  StyledCard,
+  StyledTextField,
+  StyledButton,
+  getPriorityColor,
+  getStatusColor
+} from '../theme/sspDesignSystem';
 
 const Goals = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { goals, loading, error, fetchGoals, createGoal, updateGoal, deleteGoal, prioritizeGoal } = useGoals();
   const [openDialog, setOpenDialog] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
-  const [anchorEl, setAnchorEl] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -149,99 +155,64 @@ const Goals = () => {
     fetchGoals();
   };
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'error';
-      case 'med': return 'warning';
-      case 'low': return 'info';
-      default: return 'default';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'success';
-      case 'active': return 'primary';
-      case 'archived': return 'default';
-      default: return 'default';
-    }
-  };
-
   const calculateProgress = (goal) => {
     if (goal.estimatedTotalMinutes === 0) return 0;
     return ((goal.estimatedTotalMinutes - goal.remainingMinutes) / goal.estimatedTotalMinutes) * 100;
   };
 
   return (
-    <Box>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
-            <ArrowBack />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Goals Management
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/dashboard')}>
-            Dashboard
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/calendar')}>
-            Calendar
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/availability')}>
-            Availability
-          </Button>
-          <IconButton color="inherit" onClick={handleMenuOpen}>
-            <AccountCircle />
-          </IconButton>
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-            <MenuItemComponent disabled>{user?.name}</MenuItemComponent>
-            <MenuItemComponent onClick={handleLogout}>Logout</MenuItemComponent>
-          </Menu>
-        </Toolbar>
-      </AppBar>
+    <ThemeProvider theme={sspTheme}>
+      <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+        <SharedNavbar />
 
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4">My Goals</Typography>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => handleOpenDialog()}
-          >
-            New Goal
-          </Button>
-        </Box>
+        <GradientBox sx={{ py: 6, width: '100%' }}>
+          <Container maxWidth="md" sx={{ textAlign: 'center' }}>
+            <AssignmentTurnedIn sx={{ fontSize: 48, color: '#ffda1b', mb: 2 }} />
+            <Typography variant="h3" sx={{ fontWeight: 700, mb: 1, color: 'white', fontSize: { xs: '28px', sm: '32px', md: '42px' } }}>
+              Your Goals
+            </Typography>
+            <Typography variant="h6" sx={{ color: '#e2e8f0', opacity: 0.9, fontSize: { xs: '14px', md: '18px' } }}>
+              Manage and track your learning objectives
+            </Typography>
+          </Container>
+        </GradientBox>
 
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <StyledPaper sx={{ p: 4, mb: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5, color: '#232536' }}>
+                  My Goals
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {goals.length} total goal{goals.length !== 1 ? 's' : ''}
+                </Typography>
+              </Box>
+              <StyledButton
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => handleOpenDialog()}
+              >
+                New Goal
+              </StyledButton>
+            </Box>
+          </StyledPaper>
 
-        {goals.length === 0 && !loading && (
-          <Alert severity="info">
-            No goals yet. Create your first goal to get started!
-          </Alert>
-        )}
+          {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
+          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-        <Grid container spacing={3}>
-          {goals.map((goal) => (
-            <Grid item xs={12} md={6} lg={4} key={goal._id}>
-              <Card>
-                <CardContent>
+          {goals.length === 0 && !loading && (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              No goals yet. Create your first goal to get started!
+            </Alert>
+          )}
+
+          <Grid container spacing={3}>
+            {goals.map((goal) => (
+              <Grid item xs={12} md={6} lg={4} key={goal._id}>
+                <StyledCard sx={{ p: 3, height: '100%', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', transition: 'all 0.3s ease', '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Typography variant="h6" sx={{ flex: 1 }}>
+                    <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
                       {goal.title}
                     </Typography>
                     <Box>
@@ -273,9 +244,16 @@ const Goals = () => {
                     <LinearProgress
                       variant="determinate"
                       value={calculateProgress(goal)}
-                      sx={{ height: 8, borderRadius: 1 }}
+                      sx={{
+                        height: 8,
+                        borderRadius: 1,
+                        backgroundColor: '#e2e8f0',
+                        '& .MuiLinearProgress-bar': {
+                          backgroundColor: '#ffda1b',
+                        },
+                      }}
                     />
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                       {Math.round(calculateProgress(goal))}% complete
                     </Typography>
                   </Box>
@@ -306,113 +284,155 @@ const Goals = () => {
                       />
                     )}
                   </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                </StyledCard>
+              </Grid>
+            ))}
+          </Grid>
 
-        {/* Create/Edit Dialog */}
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <form onSubmit={handleSubmit}>
-            <DialogTitle>
-              {editingGoal ? 'Edit Goal' : 'Create New Goal'}
-            </DialogTitle>
-            <DialogContent>
-              {formError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {formError}
-                </Alert>
-              )}
+          {/* Create/Edit Dialog */}
+          <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+            <form onSubmit={handleSubmit}>
+              <DialogTitle sx={{ backgroundColor: '#232536', color: 'white', fontWeight: 600 }}>
+                {editingGoal ? 'Edit Goal' : 'Create New Goal'}
+              </DialogTitle>
+              <DialogContent sx={{ mt: 2 }}>
+                {formError && (
+                  <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                    {formError}
+                  </Alert>
+                )}
 
-              <TextField
-                autoFocus
-                margin="dense"
-                name="title"
-                label="Goal Title"
-                type="text"
-                fullWidth
-                required
-                value={formData.title}
-                onChange={handleChange}
-              />
-
-              <TextField
-                margin="dense"
-                name="description"
-                label="Description"
-                type="text"
-                fullWidth
-                multiline
-                rows={3}
-                value={formData.description}
-                onChange={handleChange}
-              />
-
-              <TextField
-                margin="dense"
-                name="dueDate"
-                label="Due Date"
-                type="date"
-                fullWidth
-                required
-                InputLabelProps={{ shrink: true }}
-                value={formData.dueDate}
-                onChange={handleChange}
-              />
-
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Priority</InputLabel>
-                <Select
-                  name="priority"
-                  value={formData.priority}
-                  label="Priority"
+                <StyledTextField
+                  autoFocus
+                  margin="dense"
+                  name="title"
+                  label="Goal Title"
+                  type="text"
+                  fullWidth
+                  required
+                  value={formData.title}
                   onChange={handleChange}
-                >
-                  <MenuItem value="low">Low</MenuItem>
-                  <MenuItem value="med">Medium</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                </Select>
-              </FormControl>
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <AssignmentTurnedIn sx={{ color: '#232536' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
 
-              <TextField
-                margin="dense"
-                name="estimatedTotalMinutes"
-                label="Estimated Time (minutes)"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 1 }}
-                value={formData.estimatedTotalMinutes}
-                onChange={handleChange}
-              />
+                <StyledTextField
+                  margin="dense"
+                  name="description"
+                  label="Description"
+                  type="text"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={formData.description}
+                  onChange={handleChange}
+                />
 
-              {editingGoal && (
+                <StyledTextField
+                  margin="dense"
+                  name="dueDate"
+                  label="Due Date"
+                  type="date"
+                  fullWidth
+                  required
+                  InputLabelProps={{ shrink: true }}
+                  value={formData.dueDate}
+                  onChange={handleChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CalendarToday sx={{ color: '#232536' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
                 <FormControl fullWidth margin="dense">
-                  <InputLabel>Status</InputLabel>
+                  <InputLabel>Priority</InputLabel>
                   <Select
-                    name="status"
-                    value={formData.status}
-                    label="Status"
+                    name="priority"
+                    value={formData.priority}
+                    label="Priority"
                     onChange={handleChange}
+                    sx={{
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '8px',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e2e8f0',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#232536',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#ffda1b',
+                        borderWidth: '2px',
+                      },
+                    }}
                   >
-                    <MenuItem value="active">Active</MenuItem>
-                    <MenuItem value="completed">Completed</MenuItem>
-                    <MenuItem value="archived">Archived</MenuItem>
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="med">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
                   </Select>
                 </FormControl>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseDialog}>Cancel</Button>
-              <Button type="submit" variant="contained">
-                {editingGoal ? 'Update' : 'Create'}
-              </Button>
-            </DialogActions>
-          </form>
-        </Dialog>
-      </Container>
-    </Box>
+
+                <StyledTextField
+                  margin="dense"
+                  name="estimatedTotalMinutes"
+                  label="Estimated Time (minutes)"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 1 }}
+                  value={formData.estimatedTotalMinutes}
+                  onChange={handleChange}
+                />
+
+                {editingGoal && (
+                  <FormControl fullWidth margin="dense">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      label="Status"
+                      onChange={handleChange}
+                      sx={{
+                        backgroundColor: '#f8fafc',
+                        borderRadius: '8px',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e2e8f0',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#232536',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#ffda1b',
+                          borderWidth: '2px',
+                        },
+                      }}
+                    >
+                      <MenuItem value="active">Active</MenuItem>
+                      <MenuItem value="completed">Completed</MenuItem>
+                      <MenuItem value="archived">Archived</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+              </DialogContent>
+              <DialogActions sx={{ p: 2 }}>
+                <Button onClick={handleCloseDialog} sx={{ color: '#232536' }}>Cancel</Button>
+                <StyledButton type="submit" variant="contained">
+                  {editingGoal ? 'Update' : 'Create'}
+                </StyledButton>
+              </DialogActions>
+            </form>
+          </Dialog>
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 };
 

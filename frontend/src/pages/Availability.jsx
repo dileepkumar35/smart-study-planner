@@ -13,10 +13,6 @@ import {
   TextField,
   IconButton,
   Alert,
-  AppBar,
-  Toolbar,
-  Menu,
-  MenuItem as MenuItemComponent,
   Paper,
   Table,
   TableBody,
@@ -27,12 +23,11 @@ import {
   Chip
 } from '@mui/material';
 import {
-  ArrowBack,
-  AccountCircle,
   Save,
   Add,
   Delete
 } from '@mui/icons-material';
+import SharedNavbar from '../components/SharedNavbar';
 
 const WEEKDAYS = [
   { value: 0, label: 'Sunday' },
@@ -46,8 +41,7 @@ const WEEKDAYS = [
 
 const Availability = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [anchorEl, setAnchorEl] = useState(null);
+  const { user } = useAuth();
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,19 +68,6 @@ const Availability = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
   };
 
   const handleEditDay = (weekday) => {
@@ -161,33 +142,8 @@ const Availability = () => {
   }, 0);
 
   return (
-    <Box>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
-            <ArrowBack />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Availability Settings
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/dashboard')}>
-            Dashboard
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/goals')}>
-            Goals
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/calendar')}>
-            Calendar
-          </Button>
-          <IconButton color="inherit" onClick={handleMenuOpen}>
-            <AccountCircle />
-          </IconButton>
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-            <MenuItemComponent disabled>{user?.name}</MenuItemComponent>
-            <MenuItemComponent onClick={handleLogout}>Logout</MenuItemComponent>
-          </Menu>
-        </Toolbar>
-      </AppBar>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <SharedNavbar />
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Box sx={{ mb: 3 }}>

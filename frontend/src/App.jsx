@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext';
 import { GoalProvider } from './context/GoalContext';
 import { ScheduleProvider } from './context/ScheduleContext';
 import notificationService from './utils/notificationService';
+import { sspTheme } from './theme/sspDesignSystem';
 
 // Pages
 import Login from './pages/Login';
@@ -16,18 +17,6 @@ import Calendar from './pages/Calendar';
 import Availability from './pages/Availability';
 import MentorView from './pages/MentorView';
 import ProtectedRoute from './components/ProtectedRoute';
-
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
 
 function App() {
   useEffect(() => {
@@ -40,7 +29,7 @@ function App() {
   }, []);
 
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={sspTheme}>
       <CssBaseline />
       <AuthProvider>
         <GoalProvider>

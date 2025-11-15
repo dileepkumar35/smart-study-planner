@@ -12,10 +12,6 @@ import {
   Grid,
   IconButton,
   Alert,
-  AppBar,
-  Toolbar,
-  Menu,
-  MenuItem as MenuItemComponent,
   Chip,
   Dialog,
   DialogTitle,
@@ -25,19 +21,17 @@ import {
   LinearProgress
 } from '@mui/material';
 import {
-  ArrowBack,
-  AccountCircle,
   ChevronLeft,
   ChevronRight,
   Refresh
 } from '@mui/icons-material';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
+import SharedNavbar from '../components/SharedNavbar';
 
 const Calendar = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { fetchCalendar, rescheduleWorkUnit, regenerateSchedule } = useSchedule();
-  const [anchorEl, setAnchorEl] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [workUnits, setWorkUnits] = useState([]);
   const [events, setEvents] = useState([]);
@@ -77,19 +71,6 @@ const Calendar = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
   };
 
   const handlePreviousWeek = () => {
@@ -181,33 +162,8 @@ const Calendar = () => {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
-    <Box>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
-            <ArrowBack />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Calendar
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/dashboard')}>
-            Dashboard
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/goals')}>
-            Goals
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/availability')}>
-            Availability
-          </Button>
-          <IconButton color="inherit" onClick={handleMenuOpen}>
-            <AccountCircle />
-          </IconButton>
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-            <MenuItemComponent disabled>{user?.name}</MenuItemComponent>
-            <MenuItemComponent onClick={handleLogout}>Logout</MenuItemComponent>
-          </Menu>
-        </Toolbar>
-      </AppBar>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <SharedNavbar />
 
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>

@@ -24,7 +24,9 @@ exports.getWorkUnits = async (req, res, next) => {
     }
     
     if (status) {
-      filter.status = status;
+      // Handle comma-separated status values
+      const statuses = status.split(',').map(s => s.trim());
+      filter.status = statuses.length > 1 ? { $in: statuses } : status;
     }
 
     const workUnits = await WorkUnit.find(filter)

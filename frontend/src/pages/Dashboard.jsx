@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useGoals } from '../context/GoalContext';
 import { useSchedule } from '../context/ScheduleContext';
 import notificationService from '../utils/notificationService';
+import { ThemeProvider } from '@mui/material/styles';
 import {
   Container,
   Box,
@@ -12,31 +13,45 @@ import {
   Card,
   CardContent,
   Grid,
-  AppBar,
-  Toolbar,
   IconButton,
-  Menu,
-  MenuItem,
   LinearProgress,
   Chip,
-  Alert
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import {
-  AccountCircle,
   Add,
   PlayArrow,
   Check,
   SkipNext,
-  Notifications
+  CalendarMonth,
+  TrendingUp,
+  Schedule
 } from '@mui/icons-material';
+import SharedNavbar from '../components/SharedNavbar';
 import { format } from 'date-fns';
+import {
+  sspTheme,
+  GradientBox,
+  StyledPaper,
+  StyledCard,
+  StyledButton,
+  StyledTableRow,
+  MetricCard,
+  getStatusColor,
+  getPriorityColor
+} from '../theme/sspDesignSystem';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { goals, fetchGoals } = useGoals();
   const { workUnits, fetchWorkUnits, updateWorkUnitStatus, generateSchedule } = useSchedule();
-  const [anchorEl, setAnchorEl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [todayUnits, setTodayUnits] = useState([]);
 
@@ -56,7 +71,7 @@ const Dashboard = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
     await Promise.all([
       fetchGoals({ status: 'active' }),
-      fetchWorkUnits({ date: today })
+      fetchWorkUnits({ date: today, status: 'todo,in-progress,done' })
     ]);
     setLoading(false);
   };
@@ -65,31 +80,38 @@ const Dashboard = () => {
     setTodayUnits(workUnits);
   }, [workUnits]);
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const handleStatusUpdate = async (id, status) => {
-    await updateWorkUnitStatus(id, status);
-    loadData();
+    try {
+      await updateWorkUnitStatus(id, status);
+      
+      // If skipped, trigger rescheduling to replace it
+      if (status === 'skipped') {
+        await generateSchedule();
+      }
+      
+      await loadData();
+    } catch (err) {
+      console.error('Error updating status:', err);
+    }
   };
 
   const handleGenerateSchedule = async () => {
-    setLoading(true);
-    const result = await generateSchedule();
-    if (result.success) {
-      loadData();
+    try {
+      setLoading(true);
+      const result = await generateSchedule();
+      if (result.success) {
+        // Wait a moment for backend to save, then reload
+        setTimeout(async () => {
+          await loadData();
+        }, 500);
+      } else {
+        console.error('Schedule generation failed:', result.error);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Error generating schedule:', err);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleEnableNotifications = async () => {
@@ -99,225 +121,268 @@ const Dashboard = () => {
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'error';
-      case 'med': return 'warning';
-      case 'low': return 'info';
-      default: return 'default';
-    }
+  const calculateMetrics = () => {
+    const totalUnits = todayUnits.length;
+    const completedUnits = todayUnits.filter(u => u.status === 'done').length;
+    const inProgressUnits = todayUnits.filter(u => u.status === 'in-progress').length;
+    const totalMinutes = todayUnits.reduce((sum, u) => sum + u.durationMinutes, 0);
+    
+    return { totalUnits, completedUnits, inProgressUnits, totalMinutes };
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'done': return 'success';
-      case 'in-progress': return 'primary';
-      case 'skipped': return 'default';
-      case 'overdue': return 'error';
-      default: return 'default';
-    }
-  };
+  const metrics = calculateMetrics();
 
   return (
-    <Box>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Smart Study Planner
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/goals')}>
-            Goals
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/calendar')}>
-            Calendar
-          </Button>
-          <Button color="inherit" onClick={() => navigate('/availability')}>
-            Availability
-          </Button>
-          {['mentor', 'parent', 'admin'].includes(user?.role) && (
-            <Button color="inherit" onClick={() => navigate('/mentor')}>
-              Mentor View
-            </Button>
-          )}
-          {!notificationService.isPermissionGranted() && (
-            <IconButton 
-              color="inherit" 
-              onClick={handleEnableNotifications}
-              title="Enable Notifications"
-            >
-              <Notifications />
-            </IconButton>
-          )}
-          <IconButton
-            color="inherit"
-            onClick={handleMenuOpen}
-          >
-            <AccountCircle />
-          </IconButton>
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
-          >
-            <MenuItem disabled>{user?.name}</MenuItem>
-            <MenuItem onClick={handleLogout}>Logout</MenuItem>
-          </Menu>
-        </Toolbar>
-      </AppBar>
+    <ThemeProvider theme={sspTheme}>
+      <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+        <SharedNavbar />
 
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Welcome back, {user?.name}!
-          </Typography>
-        </Box>
+        <GradientBox sx={{ py: 6, width: '100%' }}>
+          <Container maxWidth="md" sx={{ textAlign: 'center' }}>
+            <CalendarMonth sx={{ fontSize: 48, color: '#ffda1b', mb: 2 }} />
+            <Typography variant="h3" sx={{ fontWeight: 700, mb: 1, color: 'white', fontSize: { xs: '28px', sm: '32px', md: '42px' } }}>
+              Welcome back, {user?.name}!
+            </Typography>
+            <Typography variant="h6" sx={{ color: '#e2e8f0', opacity: 0.9, fontSize: { xs: '14px', md: '18px' } }}>
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </Typography>
+          </Container>
+        </GradientBox>
 
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
 
-        <Grid container spacing={3}>
-          {/* Today's Work Units */}
-          <Grid item xs={12} md={8}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
-                    Today's Schedule ({format(new Date(), 'MMMM d, yyyy')})
-                  </Typography>
-                  <Button
-                    variant="outlined"
+          {/* Metrics Cards */}
+          <Grid container spacing={3} sx={{ mb: 4, mt: 0 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard sx={{ p: 3, textAlign: 'center', height: '100%' }}>
+                <Schedule sx={{ fontSize: 40, color: '#ffda1b', mb: 1 }} />
+                <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 1 }}>
+                  Total Tasks
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'white' }}>
+                  {metrics.totalUnits}
+                </Typography>
+              </MetricCard>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard sx={{ p: 3, textAlign: 'center', height: '100%' }}>
+                <Check sx={{ fontSize: 40, color: '#10b981', mb: 1 }} />
+                <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 1 }}>
+                  Completed
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'white' }}>
+                  {metrics.completedUnits}
+                </Typography>
+              </MetricCard>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard sx={{ p: 3, textAlign: 'center', height: '100%' }}>
+                <PlayArrow sx={{ fontSize: 40, color: '#f59e0b', mb: 1 }} />
+                <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 1 }}>
+                  In Progress
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'white' }}>
+                  {metrics.inProgressUnits}
+                </Typography>
+              </MetricCard>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard sx={{ p: 3, textAlign: 'center', height: '100%' }}>
+                <TrendingUp sx={{ fontSize: 40, color: '#8b5cf6', mb: 1 }} />
+                <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 1 }}>
+                  Total Minutes
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'white' }}>
+                  {metrics.totalMinutes}
+                </Typography>
+              </MetricCard>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={3}>
+            {/* Today's Work Units */}
+            <Grid item xs={12} md={8}>
+              <StyledPaper sx={{ p: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5, color: '#232536' }}>
+                      Today's Schedule
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {format(new Date(), 'MMMM d, yyyy')}
+                    </Typography>
+                  </Box>
+                  <StyledButton
+                    variant="contained"
                     onClick={handleGenerateSchedule}
                     disabled={loading}
+                    startIcon={<Add />}
                   >
                     Generate Schedule
-                  </Button>
+                  </StyledButton>
                 </Box>
 
                 {todayUnits.length === 0 ? (
-                  <Alert severity="info">
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>
                     No work units scheduled for today. Click "Generate Schedule" to create your study plan.
                   </Alert>
                 ) : (
-                  todayUnits.map((unit) => (
-                    <Card key={unit._id} sx={{ mb: 2 }} variant="outlined">
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="h6">
-                              {unit.goalId?.title || 'Unknown Goal'}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {format(new Date(unit.scheduledStart), 'h:mm a')} - {format(new Date(unit.scheduledEnd), 'h:mm a')}
-                              {' '}({unit.durationMinutes} min)
-                            </Typography>
-                            <Box sx={{ mt: 1 }}>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600 }}>Goal</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Time</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Priority</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {todayUnits.map((unit) => (
+                          <StyledTableRow key={unit._id}>
+                            <TableCell>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                {unit.goalId?.title || 'Unknown Goal'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {format(new Date(unit.scheduledStart), 'h:mm a')} - {format(new Date(unit.scheduledEnd), 'h:mm a')}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {unit.durationMinutes} min
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
                               <Chip
                                 label={unit.goalId?.priority || 'med'}
                                 color={getPriorityColor(unit.goalId?.priority)}
                                 size="small"
-                                sx={{ mr: 1 }}
                               />
+                            </TableCell>
+                            <TableCell>
                               <Chip
                                 label={unit.status}
                                 color={getStatusColor(unit.status)}
                                 size="small"
                               />
-                            </Box>
-                          </Box>
-                          <Box>
-                            {unit.status === 'todo' && (
-                              <>
+                            </TableCell>
+                            <TableCell align="right">
+                              {unit.status === 'todo' && (
+                                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => handleStatusUpdate(unit._id, 'in-progress')}
+                                    title="Start"
+                                  >
+                                    <PlayArrow />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    onClick={() => handleStatusUpdate(unit._id, 'done')}
+                                    title="Mark Done"
+                                  >
+                                    <Check />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleStatusUpdate(unit._id, 'skipped')}
+                                    title="Skip"
+                                  >
+                                    <SkipNext />
+                                  </IconButton>
+                                </Box>
+                              )}
+                              {unit.status === 'in-progress' && (
                                 <IconButton
-                                  color="primary"
-                                  onClick={() => handleStatusUpdate(unit._id, 'in-progress')}
-                                  title="Start"
-                                >
-                                  <PlayArrow />
-                                </IconButton>
-                                <IconButton
+                                  size="small"
                                   color="success"
                                   onClick={() => handleStatusUpdate(unit._id, 'done')}
                                   title="Mark Done"
                                 >
                                   <Check />
                                 </IconButton>
-                                <IconButton
-                                  onClick={() => handleStatusUpdate(unit._id, 'skipped')}
-                                  title="Skip"
-                                >
-                                  <SkipNext />
-                                </IconButton>
-                              </>
-                            )}
-                            {unit.status === 'in-progress' && (
-                              <IconButton
-                                color="success"
-                                onClick={() => handleStatusUpdate(unit._id, 'done')}
-                                title="Mark Done"
-                              >
-                                <Check />
-                              </IconButton>
-                            )}
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))
+                              )}
+                            </TableCell>
+                          </StyledTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
-              </CardContent>
-            </Card>
-          </Grid>
+              </StyledPaper>
+            </Grid>
 
           {/* Active Goals */}
           <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">Active Goals</Typography>
-                  <IconButton color="primary" onClick={() => navigate('/goals')}>
-                    <Add />
-                  </IconButton>
-                </Box>
+            <StyledPaper sx={{ p: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 600, color: '#232536' }}>
+                  Active Goals
+                </Typography>
+                <IconButton 
+                  sx={{
+                    backgroundColor: '#ffda1b',
+                    color: '#232536',
+                    '&:hover': {
+                      backgroundColor: '#232536',
+                      color: '#ffda1b',
+                    },
+                  }}
+                  onClick={() => navigate('/goals')}
+                >
+                  <Add />
+                </IconButton>
+              </Box>
 
-                {goals.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    No active goals. Create your first goal to get started!
-                  </Typography>
-                ) : (
-                  goals.slice(0, 5).map((goal) => (
-                    <Card key={goal._id} sx={{ mb: 2 }} variant="outlined">
-                      <CardContent>
-                        <Typography variant="subtitle1">{goal.title}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Due: {format(new Date(goal.dueDate), 'MMM d, yyyy')}
-                        </Typography>
-                        <Box sx={{ mt: 1 }}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={((goal.estimatedTotalMinutes - goal.remainingMinutes) / goal.estimatedTotalMinutes) * 100}
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            {goal.remainingMinutes} min remaining
-                          </Typography>
-                        </Box>
-                        <Chip
-                          label={goal.priority}
-                          color={getPriorityColor(goal.priority)}
-                          size="small"
-                          sx={{ mt: 1 }}
-                        />
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+              {goals.length === 0 ? (
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  No active goals. Create your first goal to get started!
+                </Alert>
+              ) : (
+                goals.slice(0, 5).map((goal) => (
+                  <StyledCard key={goal._id} sx={{ mb: 2, p: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      {goal.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Due: {format(new Date(goal.dueDate), 'MMM d, yyyy')}
+                    </Typography>
+                    <Box sx={{ mb: 1 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={((goal.estimatedTotalMinutes - goal.remainingMinutes) / goal.estimatedTotalMinutes) * 100}
+                        sx={{
+                          height: 8,
+                          borderRadius: 1,
+                          backgroundColor: '#e2e8f0',
+                          '& .MuiLinearProgress-bar': {
+                            backgroundColor: '#ffda1b',
+                          },
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        {goal.remainingMinutes} min remaining
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={goal.priority}
+                      color={getPriorityColor(goal.priority)}
+                      size="small"
+                    />
+                  </StyledCard>
+                ))
+              )}
+            </StyledPaper>
           </Grid>
-        </Grid>
-      </Container>
-    </Box>
+          </Grid>
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 };
 
