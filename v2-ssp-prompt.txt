@@ -1,0 +1,267 @@
+Data model (implement these DB tables/collections)
+
+Implement models exactly as listed (fields shown). Use migrations/schema.
+
+users
+
+id, name, email, password_hash, timezone, availability_rules (JSON), role (student/mentor/parent/admin), created_at
+
+goals
+
+id, user_id, title, description, due_date (tz-aware), priority (enum: low/med/high), estimated_total_minutes, prerequisites (array of goal_ids), created_at, status (active/archived)
+
+work_units (subtasks / chunks)
+
+id, goal_id, user_id, duration_minutes, scheduled_start (datetime), scheduled_end (datetime), status (todo/in-progress/done/skipped), sequence_index, created_at
+
+calendar_events
+
+id, user_id, source (planner/external), start, end, title, metadata (JSON)
+
+user_availability
+
+user_id, weekday (0–6), start_time (HH:MM), end_time (HH:MM), exceptions (vacation dates)
+
+notifications
+
+id, user_id, type (email/browser/webhook), payload, scheduled_time, sent_at, status
+
+3 — Backend API endpoints (exact list to implement)
+
+Implement RESTful routes (or GraphQL) with authentication (JWT + httpOnly cookie recommended).
+
+Auth / Users
+
+POST /api/auth/register
+
+POST /api/auth/login
+
+GET /api/users/me
+
+PUT /api/users/me (update availability/timezone)
+
+Goals & WorkUnits
+
+POST /api/goals — create goal
+
+GET /api/goals — list (filter by user)
+
+GET /api/goals/:id
+
+PUT /api/goals/:id
+
+DELETE /api/goals/:id
+
+POST /api/goals/:id/prioritize — change priority or deadline adjustments
+
+WorkUnits (subtasks)
+
+GET /api/work-units?date=YYYY-MM-DD
+
+POST /api/work-units (manual override)
+
+PUT /api/work-units/:id/status — mark done/in-progress/skipped
+
+PUT /api/work-units/:id/reschedule — manual reschedule
+
+Scheduler & Calendar
+
+POST /api/scheduler/generate?date=YYYY-MM-DD — run scheduler for a user (id from auth)
+
+GET /api/calendar?rangeStart=...&rangeEnd=... — returns calendar events + work_units
+
+POST /api/calendar/import — optional external import
+
+Notifications
+
+POST /api/notifications/test — test webhook/email
+
+GET /api/notifications — pending notifications
+
+Role views
+
+GET /api/mentor/users/:userId/progress — mentor/parent view
+
+
+7 — Reminders & notifications (exact features)
+
+Browser notifications:
+
+Use Notification API for Windows browsers (Edge/Chrome). Frontend permission flow and service worker for background notifications.
+
+
+4 — Scheduler: rule-based engine (exact logic to implement)
+
+Implement scheduler as a deterministic function you can unit test. Core responsibilities:
+
+Inputs:
+
+All active goals for user (with due_date, priority, remaining_minutes)
+
+User availability windows and weekly commitments/busy slots
+
+Existing scheduled work_units (so you don't double-book)
+
+Configurable rules (preserve minimum daily minutes for long goals, maximum chunk size, etc.)
+
+Process (step-by-step algorithm):
+
+Compute horizon: find all days between today and the nearest due_date of active goals (or configurable horizon, e.g., 30 days).
+
+Create availability calendar: for each day, map free time slots by subtracting weekly commitments and existing calendar events.
+
+Normalize goal urgency score: for each goal compute urgency = f(priority, time_left, remaining_minutes) where:
+
+time_left = minutes until due_date (tz-aware)
+
+urgency ∝ (priority_weight / (time_left / remaining_minutes + ϵ))
+
+This gives higher score for high-priority and close-deadline goals.
+
+Chunking:
+
+For each goal, split remaining_minutes into work units of size between min_chunk and max_chunk (configurable, e.g., 25–90 minutes), preferring Pomodoro-like sizes.
+
+Respect prerequisites: do not schedule units of a goal whose prerequisite is incomplete.
+
+Greedy allocation by day:
+
+Iterate days in chronological order.
+
+On each day, allocate slots from highest urgency to lowest until day capacity exhausted.
+
+Prefer to place earlier in the availability window (avoid backloading).
+
+Preserve min_daily_progress for long-range goals: ensure each long goal gets at least X minutes per week/day if configured.
+
+Hard constraints & overflow handling:
+
+If a goal cannot be scheduled before its due date given available windows → mark as conflict and return to client with suggested actions (extend due date, increase availability).
+
+Output:
+
+A set of work_units with scheduled_start/end and status todo.
+
+Audit log of why particular units were scheduled (for UI tooltips).
+
+Rescheduling logic (on skip / completion / new goal):
+
+When a unit is skipped or a new goal is added, re-run scheduler for remaining horizon with existing done units immutable and skipped units marked as available for reallocation (but with a small penalty to avoid immediate rescheduling to same later day).
+
+Add an urgency escalation for overdue units: escalate urgency linearly by days overdue to prevent infinite postponement.
+
+If user reduces availability, recompute and mark conflicts.
+
+Determinism & Testing:
+
+The scheduler must be deterministic given the same inputs and configuration.
+
+Expose deterministic seed or deterministic ordering for unit tests.
+
+5 — Frontend components & UX (exact components)
+
+Authentication screens (register/login)
+
+Dashboard (today’s prioritized list)
+
+Show remaining minutes, progress bar, quick “mark done/skip/start” actions
+
+Goal creation/edit modal
+
+Title, description, due date (calendar picker with timezone), priority, estimated effort, prerequisites selector
+
+Availability editor
+
+Weekly grid (Mon–Sun) to set daily windows and busy slots
+
+Calendar view (month / week / day)
+
+Drag-and-drop reschedule (drag a work_unit to new slot → call PUT /api/work-units/:id/reschedule)
+
+Click to open unit details / mark done
+
+Visual distinction: planner units vs external events
+
+Scheduler control panel
+
+Buttons: “Generate today”, “Regenerate full schedule”, “Show conflicts”
+
+Slider/controls for rules (min chunk, max chunk, min daily progress)
+
+Notifications UI
+
+Toggle for browser notification permission and email webhook setup
+
+Mentor/Parent view
+
+Read-only calendar for linked students, progress metrics, upcoming deadlines
+
+
+6 — Task lifecycle & actions (exact behaviors)
+
+start action:
+
+Marks work_unit in-progress and optionally starts a timer in UI.
+
+done action:
+
+Marks status = done, decrement remaining_minutes on goal, remove from future schedule or mark as completed.
+
+Trigger rescheduler to fill freed time with other work_units if desired.
+
+skip action:
+
+Marks status = skipped, timestamp it, re-run scheduler and escalate urgency for the skipped unit.
+
+edit/reschedule action:
+
+Manual move updates scheduled_start/end and persists; triggers a light scheduler pass to adjust surrounding units.
+
+Overdue handling:
+
+If current time > scheduled_end and status not done → status becomes overdue, escalate urgency and surface in dashboard.
+
+
+11 — Role-based views & access control (exact rules)
+
+Roles: student, mentor, parent, admin
+
+Permissions:
+
+Student: full CRUD on own goals, run scheduler only for themselves.
+
+Mentor/Parent: read-only access to linked student's calendar + metrics; 
+
+Endpoints must enforce role checks (middleware).
+
+
+
+
+
+
+
+Use cases (exact, real user flows)
+
+Daily study plan for exams (student)
+
+Student creates 3 goals (Math midterm due in 7 days, Physics assignment due in 3 days, Long-term project due in 30 days). Sets availability 18:00-21:00. Scheduler chunks and prioritizes physics and math first; long-term project gets a minimum daily chunk.
+
+Catch-up after missed sessions
+
+Student skips two sessions. Scheduler re-runs, escalates overdue units’ urgency, redistributes remaining time to ensure the closest deadlines are fulfilled first.
+
+Parent / Mentor check-in
+
+Parent logs into mentor view and sees next 7 days, upcoming deadlines, and a progress percentage for each goal.
+
+Busy week with constraints
+
+User marks three evenings busy. Scheduler respects reduced availability, flags a conflict for a near-term high-effort goal and suggests actions (extend deadline or add study hours).
+
+Add last-minute high-priority task
+
+User creates a new urgent goal. Scheduler reorders upcoming days to allocate time to the urgent goal and warns about likely impact to long-range goals.
+
+Export / Reminders
+
+User requests browser reminders 15 minutes prior to each session. Notifications fire; missed notifications can be checked in app logs.
