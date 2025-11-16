@@ -98,7 +98,11 @@ export const ScheduleProvider = ({ children }) => {
       const response = await schedulerAPI.getCalendar(rangeStart, rangeEnd);
       setWorkUnits(response.data.data.workUnits);
       setCalendarEvents(response.data.data.events);
-      return { success: true };
+      return { 
+        success: true,
+        workUnits: response.data.data.workUnits,
+        events: response.data.data.events
+      };
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'Failed to fetch calendar';
       setError(errorMsg);

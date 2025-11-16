@@ -56,22 +56,45 @@ class NotificationService {
 
   // Schedule a notification for a work unit
   scheduleWorkUnitNotification(workUnit, reminderMinutes = 15) {
-    if (!this.isPermissionGranted() || !this.registration) {
-      console.warn('Cannot schedule notification: permission not granted or service worker not registered');
+    if (!this.isPermissionGranted()) {
+      console.warn('Cannot schedule notification: permission not granted');
       return;
     }
 
-    // Send message to service worker to schedule the notification
-    if (navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'SCHEDULE_NOTIFICATION',
-        workUnit,
-        reminderMinutes
-      });
+    const scheduledTime = new Date(workUnit.scheduledStart);
+    const notificationTime = new Date(scheduledTime.getTime() - reminderMinutes * 60000);
+    const now = new Date();
+
+    // Only schedule if the notification time is in the future
+    if (notificationTime > now) {
+      const delay = notificationTime.getTime() - now.getTime();
+      
+      setTimeout(() => {
+        const priority = workUnit.goalId?.priority || 'med';
+        const priorityEmoji = priority === 'high' ? '🔴' : priority === 'med' ? '🟡' : '🟢';
+        
+        this.showNotification(`${priorityEmoji} Upcoming Study Session`, {
+          body: `${workUnit.goalId?.title || 'Task'} starts in ${reminderMinutes} minutes`,
+          tag: `work-unit-${workUnit._id}`,
+          requireInteraction: priority === 'high',
+          actions: [
+            { action: 'view', title: 'View Task' },
+            { action: 'dismiss', title: 'Dismiss' }
+          ],
+          data: {
+            workUnitId: workUnit._id,
+            url: '/dashboard'
+          }
+        });
+      }, delay);
+
+      console.log(`Scheduled notification for ${workUnit.goalId?.title} at ${notificationTime.toLocaleString()}`);
+    } else {
+      console.log(`Skipped past notification for ${workUnit.goalId?.title}`);
     }
   }
 
-  // Schedule notifications for multiple work units
+  // Schedule notifications for multiple work units with different reminder times
   scheduleMultipleNotifications(workUnits, reminderMinutes = 15) {
     if (!this.isPermissionGranted()) {
       console.warn('Cannot schedule notifications: permission not granted');
@@ -79,7 +102,49 @@ class NotificationService {
     }
 
     workUnits.forEach(workUnit => {
+      // Schedule main reminder
       this.scheduleWorkUnitNotification(workUnit, reminderMinutes);
+      
+      // For high priority tasks, also schedule a 5-minute reminder
+      if (workUnit.goalId?.priority === 'high') {
+        this.scheduleWorkUnitNotification(workUnit, 5);
+      }
+    });
+  }
+
+  // Send overdue task notification
+  sendOverdueNotification(workUnit) {
+    if (!this.isPermissionGranted()) {
+      return;
+    }
+
+    this.showNotification('⏰ Overdue Task', {
+      body: `${workUnit.goalId?.title || 'Task'} is now overdue. Please reschedule or complete it.`,
+      tag: `overdue-${workUnit._id}`,
+      requireInteraction: true,
+      actions: [
+        { action: 'reschedule', title: 'Reschedule' },
+        { action: 'complete', title: 'Mark Complete' }
+      ],
+      data: {
+        workUnitId: workUnit._id,
+        url: '/dashboard'
+      }
+    });
+  }
+
+  // Send task completion celebration
+  sendCompletionNotification(goalTitle, completedTasks, totalTasks) {
+    if (!this.isPermissionGranted()) {
+      return;
+    }
+
+    this.showNotification('✅ Great Progress!', {
+      body: `You've completed ${completedTasks}/${totalTasks} tasks for "${goalTitle}"`,
+      tag: 'completion',
+      data: {
+        url: '/dashboard'
+      }
     });
   }
 

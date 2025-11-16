@@ -78,11 +78,32 @@ const Dashboard = () => {
 
   useEffect(() => {
     setTodayUnits(workUnits);
+    
+    // Check for overdue tasks and send notifications
+    const now = new Date();
+    workUnits.forEach(unit => {
+      const scheduledEnd = new Date(unit.scheduledEnd);
+      if (scheduledEnd < now && unit.status === 'todo' && notificationService.isPermissionGranted()) {
+        notificationService.sendOverdueNotification(unit);
+      }
+    });
   }, [workUnits]);
 
   const handleStatusUpdate = async (id, status) => {
     try {
+      const workUnit = todayUnits.find(u => u._id === id);
       await updateWorkUnitStatus(id, status);
+      
+      // If completed, send celebration notification
+      if (status === 'done' && workUnit?.goalId) {
+        const completedCount = todayUnits.filter(u => u.goalId?._id === workUnit.goalId._id && u.status === 'done').length + 1;
+        const totalCount = todayUnits.filter(u => u.goalId?._id === workUnit.goalId._id).length;
+        notificationService.sendCompletionNotification(
+          workUnit.goalId.title,
+          completedCount,
+          totalCount
+        );
+      }
       
       // If skipped, trigger rescheduling to replace it
       if (status === 'skipped') {
@@ -92,6 +113,7 @@ const Dashboard = () => {
       await loadData();
     } catch (err) {
       console.error('Error updating status:', err);
+      alert('Failed to update task status. Please try again.');
     }
   };
 
@@ -103,13 +125,20 @@ const Dashboard = () => {
         // Wait a moment for backend to save, then reload
         setTimeout(async () => {
           await loadData();
+          // Reschedule notifications for new work units
+          if (result.workUnits && notificationService.isPermissionGranted()) {
+            notificationService.scheduleMultipleNotifications(result.workUnits, 15);
+          }
+          setLoading(false);
         }, 500);
       } else {
         console.error('Schedule generation failed:', result.error);
+        alert('Failed to generate schedule: ' + (result.error || 'Unknown error'));
         setLoading(false);
       }
     } catch (err) {
       console.error('Error generating schedule:', err);
+      alert('Error generating schedule. Please check your goals and try again.');
       setLoading(false);
     }
   };

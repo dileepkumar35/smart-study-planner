@@ -68,8 +68,11 @@ export const workUnitsAPI = {
 
 // Scheduler API
 export const schedulerAPI = {
-  generate: (date) => api.post('/scheduler/generate', null, { params: { date } }),
-  regenerate: () => api.post('/scheduler/regenerate'),
+  generate: (date) => {
+    const params = date ? { date } : {};
+    return api.post('/scheduler/generate', {}, { params });
+  },
+  regenerate: () => api.post('/scheduler/regenerate', {}),
   getCalendar: (rangeStart, rangeEnd) => api.get('/scheduler/calendar', { 
     params: { rangeStart, rangeEnd } 
   }),

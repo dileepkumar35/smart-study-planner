@@ -29,18 +29,6 @@ const seedUsers = [
     }
   },
   {
-    name: 'Rajesh Kumar',
-    email: 'rajesh@example.com',
-    password: 'password123',
-    role: 'student',
-    timezone: 'Asia/Kolkata',
-    availabilityRules: {
-      preferredStudyHours: '10:00-13:00,15:00-18:00,20:00-23:00',
-      breakDuration: 15,
-      sessionDuration: 60
-    }
-  },
-  {
     name: 'Mentor Admin',
     email: 'mentor@example.com',
     password: 'password123',
@@ -123,8 +111,8 @@ const seedGoals = (userId) => [
     description: 'Learn ES6+, async/await, and JavaScript design patterns',
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     priority: 'high',
-    estimatedTotalMinutes: 7200,
-    remainingMinutes: 7200,
+    estimatedTotalMinutes: 72,
+    remainingMinutes: 72,
     prerequisites: [],
     status: 'active'
   },
@@ -134,8 +122,8 @@ const seedGoals = (userId) => [
     description: 'Build 5 complete React projects with hooks, state management, and routing',
     dueDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
     priority: 'high',
-    estimatedTotalMinutes: 9600,
-    remainingMinutes: 9600,
+    estimatedTotalMinutes: 96,
+    remainingMinutes: 96,
     prerequisites: [],
     status: 'active'
   },
@@ -145,8 +133,8 @@ const seedGoals = (userId) => [
     description: 'Database design, schema modeling, aggregation pipelines, and optimization',
     dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
     priority: 'med',
-    estimatedTotalMinutes: 4800,
-    remainingMinutes: 4800,
+    estimatedTotalMinutes: 48,
+    remainingMinutes: 48,
     prerequisites: [],
     status: 'active'
   },
@@ -156,8 +144,8 @@ const seedGoals = (userId) => [
     description: 'Create production-ready APIs with authentication, validation, and error handling',
     dueDate: new Date(Date.now() + 35 * 24 * 60 * 60 * 1000),
     priority: 'med',
-    estimatedTotalMinutes: 6000,
-    remainingMinutes: 6000,
+    estimatedTotalMinutes: 60,
+    remainingMinutes: 60,
     prerequisites: [],
     status: 'active'
   },
@@ -167,8 +155,8 @@ const seedGoals = (userId) => [
     description: 'Containerization, Docker Compose, CI/CD pipelines, and deployment',
     dueDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
     priority: 'low',
-    estimatedTotalMinutes: 4200,
-    remainingMinutes: 4200,
+    estimatedTotalMinutes: 42,
+    remainingMinutes: 42,
     prerequisites: [],
     status: 'active'
   },
@@ -178,8 +166,8 @@ const seedGoals = (userId) => [
     description: 'Flexbox, Grid, animations, and mobile-first design principles',
     dueDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
     priority: 'med',
-    estimatedTotalMinutes: 3600,
-    remainingMinutes: 3600,
+    estimatedTotalMinutes: 36,
+    remainingMinutes: 36,
     prerequisites: [],
     status: 'active'
   }
@@ -352,11 +340,6 @@ async function seedData() {
     console.log(`  - Work units (7 days): ${seedWorkUnits(null, [null, null, null]).length}`);
     console.log(`  - Calendar events per user: ${seedCalendarEvents(null).length}`);
 
-    console.log('\n🔐 Test Credentials:');
-    console.log('  Student: dileep@example.com / password123');
-    console.log('  Student: rajesh@example.com / password123');
-    console.log('  Mentor: mentor@example.com / password123');
-    console.log('  Admin: admin@example.com / password123');
 
     process.exit(0);
   } catch (error) {

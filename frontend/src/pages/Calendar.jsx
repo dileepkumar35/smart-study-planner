@@ -18,21 +18,45 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  LinearProgress
+  LinearProgress,
+  ToggleButton,
+  ToggleButtonGroup,
+  Divider
 } from '@mui/material';
 import {
   ChevronLeft,
   ChevronRight,
-  Refresh
+  Refresh,
+  ViewWeek,
+  CalendarMonth,
+  ViewDay
 } from '@mui/icons-material';
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
+import { 
+  format, 
+  startOfWeek, 
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+  addDays, 
+  addWeeks, 
+  addMonths,
+  subWeeks, 
+  subMonths,
+  subDays,
+  isSameDay,
+  isSameMonth,
+  eachDayOfInterval,
+  getDay
+} from 'date-fns';
 import SharedNavbar from '../components/SharedNavbar';
 
 const Calendar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { fetchCalendar, rescheduleWorkUnit, regenerateSchedule } = useSchedule();
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [viewMode, setViewMode] = useState('week'); // 'day', 'week', 'month'
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [workUnits, setWorkUnits] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,23 +70,39 @@ const Calendar = () => {
 
   useEffect(() => {
     loadCalendar();
-  }, [currentWeek]);
+  }, [currentDate, viewMode]);
 
   const loadCalendar = async () => {
     setLoading(true);
     setError('');
     
-    const weekStart = startOfWeek(currentWeek);
-    const weekEnd = addDays(weekStart, 6);
+    let rangeStart, rangeEnd;
+    
+    switch (viewMode) {
+      case 'day':
+        rangeStart = startOfDay(currentDate);
+        rangeEnd = endOfDay(currentDate);
+        break;
+      case 'week':
+        rangeStart = startOfWeek(currentDate);
+        rangeEnd = addDays(rangeStart, 6);
+        break;
+      case 'month':
+        rangeStart = startOfMonth(currentDate);
+        rangeEnd = endOfMonth(currentDate);
+        break;
+      default:
+        rangeStart = startOfWeek(currentDate);
+        rangeEnd = addDays(rangeStart, 6);
+    }
     
     try {
       const response = await fetchCalendar(
-        weekStart.toISOString(),
-        weekEnd.toISOString()
+        rangeStart.toISOString(),
+        rangeEnd.toISOString()
       );
       
       if (response.success) {
-        // Organize work units by day
         setWorkUnits(response.workUnits || []);
         setEvents(response.events || []);
       }
@@ -73,16 +113,42 @@ const Calendar = () => {
     }
   };
 
-  const handlePreviousWeek = () => {
-    setCurrentWeek(subWeeks(currentWeek, 1));
+  const handlePrevious = () => {
+    switch (viewMode) {
+      case 'day':
+        setCurrentDate(subDays(currentDate, 1));
+        break;
+      case 'week':
+        setCurrentDate(subWeeks(currentDate, 1));
+        break;
+      case 'month':
+        setCurrentDate(subMonths(currentDate, 1));
+        break;
+    }
   };
 
-  const handleNextWeek = () => {
-    setCurrentWeek(addWeeks(currentWeek, 1));
+  const handleNext = () => {
+    switch (viewMode) {
+      case 'day':
+        setCurrentDate(addDays(currentDate, 1));
+        break;
+      case 'week':
+        setCurrentDate(addWeeks(currentDate, 1));
+        break;
+      case 'month':
+        setCurrentDate(addMonths(currentDate, 1));
+        break;
+    }
   };
 
   const handleToday = () => {
-    setCurrentWeek(new Date());
+    setCurrentDate(new Date());
+  };
+
+  const handleViewModeChange = (event, newMode) => {
+    if (newMode !== null) {
+      setViewMode(newMode);
+    }
   };
 
   const handleOpenReschedule = (unit) => {
@@ -158,81 +224,59 @@ const Calendar = () => {
     }
   };
 
-  const weekStart = startOfWeek(currentWeek);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const getDateRangeText = () => {
+    switch (viewMode) {
+      case 'day':
+        return format(currentDate, 'EEEE, MMMM d, yyyy');
+      case 'week':
+        const weekStart = startOfWeek(currentDate);
+        return `${format(weekStart, 'MMMM d')} - ${format(addDays(weekStart, 6), 'MMMM d, yyyy')}`;
+      case 'month':
+        return format(currentDate, 'MMMM yyyy');
+      default:
+        return '';
+    }
+  };
 
-  return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      <SharedNavbar />
+  const renderDayView = () => {
+    const dayUnits = getUnitsForDay(currentDate);
+    const dayEvents = getEventsForDay(currentDate);
+    const hours = Array.from({ length: 24 }, (_, i) => i);
 
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton onClick={handlePreviousWeek}>
-              <ChevronLeft />
-            </IconButton>
-            <Typography variant="h5">
-              {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
-            </Typography>
-            <IconButton onClick={handleNextWeek}>
-              <ChevronRight />
-            </IconButton>
-            <Button variant="outlined" onClick={handleToday}>
-              Today
-            </Button>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={<Refresh />}
-            onClick={handleRegenerate}
-            disabled={loading}
-          >
-            Regenerate Schedule
-          </Button>
-        </Box>
+    return (
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            {format(currentDate, 'EEEE, MMMM d, yyyy')}
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          
+          <Box sx={{ maxHeight: '600px', overflowY: 'auto' }}>
+            {hours.map((hour) => {
+              const hourUnits = dayUnits.filter(unit => {
+                const unitHour = new Date(unit.scheduledStart).getHours();
+                return unitHour === hour;
+              });
+              const hourEvents = dayEvents.filter(event => {
+                const eventHour = new Date(event.start).getHours();
+                return eventHour === hour;
+              });
 
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-        <Grid container spacing={2}>
-          {days.map((day) => {
-            const dayUnits = getUnitsForDay(day);
-            const dayEvents = getEventsForDay(day);
-            const isToday = isSameDay(day, new Date());
-
-            return (
-              <Grid item xs={12} md={6} lg={3} key={day.toString()}>
-                <Card sx={{ 
-                  height: '100%',
-                  border: isToday ? '2px solid' : 'none',
-                  borderColor: 'primary.main'
-                }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      {format(day, 'EEEE')}
-                      {isToday && (
-                        <Chip label="Today" color="primary" size="small" sx={{ ml: 1 }} />
-                      )}
+              return (
+                <Box key={hour} sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', minHeight: '60px' }}>
+                  <Box sx={{ width: '80px', p: 1, borderRight: '1px solid #e0e0e0', flexShrink: 0 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {format(new Date().setHours(hour, 0, 0, 0), 'h:mm a')}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      {format(day, 'MMM d')}
-                    </Typography>
-
-                    {dayUnits.length === 0 && dayEvents.length === 0 && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        No scheduled items
-                      </Typography>
-                    )}
-
-                    {/* Work Units */}
-                    {dayUnits.map((unit) => (
+                  </Box>
+                  <Box sx={{ flex: 1, p: 1 }}>
+                    {hourUnits.map((unit) => (
                       <Card
                         key={unit._id}
                         sx={{
-                          mt: 1,
+                          mb: 0.5,
                           p: 1,
                           bgcolor: 'primary.light',
-                          color: 'primary.contrastText',
                           cursor: 'pointer'
                         }}
                         onClick={() => handleOpenReschedule(unit)}
@@ -243,26 +287,21 @@ const Calendar = () => {
                         <Typography variant="caption" display="block">
                           {format(new Date(unit.scheduledStart), 'h:mm a')} - {format(new Date(unit.scheduledEnd), 'h:mm a')}
                         </Typography>
-                        <Box sx={{ mt: 0.5 }}>
-                          <Chip
-                            label={unit.status}
-                            color={getStatusColor(unit.status)}
-                            size="small"
-                            sx={{ height: 20, fontSize: '0.7rem' }}
-                          />
-                        </Box>
+                        <Chip
+                          label={unit.status}
+                          color={getStatusColor(unit.status)}
+                          size="small"
+                          sx={{ height: 18, fontSize: '0.65rem', mt: 0.5 }}
+                        />
                       </Card>
                     ))}
-
-                    {/* Calendar Events */}
-                    {dayEvents.map((event) => (
+                    {hourEvents.map((event) => (
                       <Card
                         key={event._id}
                         sx={{
-                          mt: 1,
+                          mb: 0.5,
                           p: 1,
-                          bgcolor: 'grey.300',
-                          color: 'text.primary'
+                          bgcolor: 'grey.300'
                         }}
                       >
                         <Typography variant="body2" fontWeight="bold">
@@ -271,19 +310,269 @@ const Calendar = () => {
                         <Typography variant="caption" display="block">
                           {format(new Date(event.start), 'h:mm a')} - {format(new Date(event.end), 'h:mm a')}
                         </Typography>
-                        <Chip
-                          label="Event"
-                          size="small"
-                          sx={{ height: 20, fontSize: '0.7rem', mt: 0.5 }}
-                        />
                       </Card>
                     ))}
-                  </CardContent>
-                </Card>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderWeekView = () => {
+    const weekStart = startOfWeek(currentDate);
+    const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+    return (
+      <Grid container spacing={2}>
+        {days.map((day) => {
+          const dayUnits = getUnitsForDay(day);
+          const dayEvents = getEventsForDay(day);
+          const isToday = isSameDay(day, new Date());
+
+          return (
+            <Grid item xs={12} md={6} lg={1.714} key={day.toString()}>
+              <Card sx={{ 
+                height: '100%',
+                border: isToday ? '2px solid' : 'none',
+                borderColor: 'primary.main'
+              }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    {format(day, 'EEE')}
+                    {isToday && (
+                      <Chip label="Today" color="primary" size="small" sx={{ ml: 0.5, height: 18, fontSize: '0.65rem' }} />
+                    )}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    {format(day, 'MMM d')}
+                  </Typography>
+
+                  {dayUnits.length === 0 && dayEvents.length === 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 2 }}>
+                      No items
+                    </Typography>
+                  )}
+
+                  {dayUnits.map((unit) => (
+                    <Card
+                      key={unit._id}
+                      sx={{
+                        mt: 1,
+                        p: 1,
+                        bgcolor: 'primary.light',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleOpenReschedule(unit)}
+                    >
+                      <Typography variant="caption" fontWeight="bold" display="block">
+                        {unit.goalId?.title || 'Unknown Goal'}
+                      </Typography>
+                      <Typography variant="caption" display="block" sx={{ fontSize: '0.65rem' }}>
+                        {format(new Date(unit.scheduledStart), 'h:mm a')}
+                      </Typography>
+                      <Chip
+                        label={unit.status}
+                        color={getStatusColor(unit.status)}
+                        size="small"
+                        sx={{ height: 16, fontSize: '0.6rem', mt: 0.5 }}
+                      />
+                    </Card>
+                  ))}
+
+                  {dayEvents.map((event) => (
+                    <Card
+                      key={event._id}
+                      sx={{
+                        mt: 1,
+                        p: 1,
+                        bgcolor: 'grey.300'
+                      }}
+                    >
+                      <Typography variant="caption" fontWeight="bold" display="block">
+                        {event.title}
+                      </Typography>
+                      <Typography variant="caption" display="block" sx={{ fontSize: '0.65rem' }}>
+                        {format(new Date(event.start), 'h:mm a')}
+                      </Typography>
+                    </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+    );
+  };
+
+  const renderMonthView = () => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const startDate = startOfWeek(monthStart);
+    const endDate = addDays(startOfWeek(monthEnd), 6);
+    
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const weeks = [];
+    
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+
+    return (
+      <Card>
+        <CardContent>
+          <Grid container spacing={1}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <Grid item xs={12/7} key={day}>
+                <Typography variant="subtitle2" align="center" fontWeight="bold">
+                  {day}
+                </Typography>
               </Grid>
-            );
-          })}
-        </Grid>
+            ))}
+          </Grid>
+          
+          {weeks.map((week, weekIndex) => (
+            <Grid container spacing={1} key={weekIndex} sx={{ mt: 0.5 }}>
+              {week.map((day) => {
+                const dayUnits = getUnitsForDay(day);
+                const dayEvents = getEventsForDay(day);
+                const isToday = isSameDay(day, new Date());
+                const isCurrentMonth = isSameMonth(day, currentDate);
+
+                return (
+                  <Grid item xs={12/7} key={day.toString()}>
+                    <Card
+                      sx={{
+                        minHeight: '100px',
+                        bgcolor: isToday ? 'primary.light' : isCurrentMonth ? 'white' : 'grey.50',
+                        border: isToday ? '2px solid' : '1px solid',
+                        borderColor: isToday ? 'primary.main' : 'grey.300',
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'grey.100' }
+                      }}
+                      onClick={() => {
+                        setCurrentDate(day);
+                        setViewMode('day');
+                      }}
+                    >
+                      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                        <Typography 
+                          variant="caption" 
+                          fontWeight={isToday ? 'bold' : 'normal'}
+                          color={isCurrentMonth ? 'text.primary' : 'text.secondary'}
+                        >
+                          {format(day, 'd')}
+                        </Typography>
+                        
+                        <Box sx={{ mt: 0.5 }}>
+                          {dayUnits.slice(0, 2).map((unit) => (
+                            <Box
+                              key={unit._id}
+                              sx={{
+                                bgcolor: 'primary.main',
+                                color: 'white',
+                                borderRadius: 0.5,
+                                px: 0.5,
+                                mb: 0.25,
+                                fontSize: '0.6rem'
+                              }}
+                            >
+                              {unit.goalId?.title?.substring(0, 15) || 'Task'}
+                            </Box>
+                          ))}
+                          {dayEvents.slice(0, 1).map((event) => (
+                            <Box
+                              key={event._id}
+                              sx={{
+                                bgcolor: 'grey.500',
+                                color: 'white',
+                                borderRadius: 0.5,
+                                px: 0.5,
+                                mb: 0.25,
+                                fontSize: '0.6rem'
+                              }}
+                            >
+                              {event.title?.substring(0, 15) || 'Event'}
+                            </Box>
+                          ))}
+                          {(dayUnits.length + dayEvents.length > 3) && (
+                            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>
+                              +{dayUnits.length + dayEvents.length - 3} more
+                            </Typography>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <SharedNavbar />
+
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <IconButton onClick={handlePrevious}>
+              <ChevronLeft />
+            </IconButton>
+            <Typography variant="h5" sx={{ minWidth: '250px' }}>
+              {getDateRangeText()}
+            </Typography>
+            <IconButton onClick={handleNext}>
+              <ChevronRight />
+            </IconButton>
+            <Button variant="outlined" onClick={handleToday}>
+              Today
+            </Button>
+          </Box>
+          
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={handleViewModeChange}
+              size="small"
+            >
+              <ToggleButton value="day">
+                <ViewDay sx={{ mr: 0.5 }} /> Day
+              </ToggleButton>
+              <ToggleButton value="week">
+                <ViewWeek sx={{ mr: 0.5 }} /> Week
+              </ToggleButton>
+              <ToggleButton value="month">
+                <CalendarMonth sx={{ mr: 0.5 }} /> Month
+              </ToggleButton>
+            </ToggleButtonGroup>
+            
+            <Button
+              variant="contained"
+              startIcon={<Refresh />}
+              onClick={handleRegenerate}
+              disabled={loading}
+            >
+              Regenerate
+            </Button>
+          </Box>
+        </Box>
+
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+        {viewMode === 'day' && renderDayView()}
+        {viewMode === 'week' && renderWeekView()}
+        {viewMode === 'month' && renderMonthView()}
 
         {/* Reschedule Dialog */}
         <Dialog open={rescheduleDialog} onClose={handleCloseReschedule} maxWidth="sm" fullWidth>
