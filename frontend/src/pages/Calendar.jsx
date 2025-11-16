@@ -243,6 +243,48 @@ const Calendar = () => {
     const dayEvents = getEventsForDay(currentDate);
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
+    // Calculate position and height for time blocks
+    const getBlockStyle = (startTime, endTime, nestLevel = 0) => {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      
+      const startHour = start.getHours();
+      const startMinute = start.getMinutes();
+      const endHour = end.getHours();
+      const endMinute = end.getMinutes();
+      
+      // Calculate top position relative to the hour (not the parent)
+      const topOffset = startMinute;
+      
+      // Calculate height in minutes
+      const durationMinutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
+      
+      // Add left padding for nested items - each level indents 80px
+      const leftPadding = nestLevel > 0 ? `${80 * nestLevel}px` : 0;
+      const rightPadding = nestLevel > 0 ? '8px' : 0;
+      
+      return {
+        position: 'absolute',
+        top: `${topOffset}px`,
+        left: leftPadding,
+        right: rightPadding,
+        height: `${durationMinutes}px`,
+        minHeight: `${durationMinutes}px`
+      };
+    };
+
+    // Check if a time range is nested within another
+    const isNestedWithin = (innerStart, innerEnd, outerStart, outerEnd) => {
+      const inner1 = new Date(innerStart).getTime();
+      const inner2 = new Date(innerEnd).getTime();
+      const outer1 = new Date(outerStart).getTime();
+      const outer2 = new Date(outerEnd).getTime();
+      
+      // Inner must start at or after outer start AND end at or before outer end
+      // But should not be exactly the same (that would be duplicate, not nested)
+      return inner1 >= outer1 && inner2 <= outer2 && !(inner1 === outer1 && inner2 === outer2);
+    };
+
     return (
       <Card>
         <CardContent>
@@ -253,65 +295,140 @@ const Calendar = () => {
           
           <Box sx={{ maxHeight: '600px', overflowY: 'auto' }}>
             {hours.map((hour) => {
-              const hourUnits = dayUnits.filter(unit => {
-                const unitHour = new Date(unit.scheduledStart).getHours();
-                return unitHour === hour;
-              });
-              const hourEvents = dayEvents.filter(event => {
-                const eventHour = new Date(event.start).getHours();
-                return eventHour === hour;
+              // Get all units and events starting in this hour
+              const unitsStartingInHour = dayUnits.filter(unit => {
+                const startHour = new Date(unit.scheduledStart).getHours();
+                return startHour === hour;
               });
 
+              const eventsStartingInHour = dayEvents.filter(event => {
+                const startHour = new Date(event.start).getHours();
+                return startHour === hour;
+              });
+
+              // Combine all items for nesting analysis
+              const allItems = [
+                ...unitsStartingInHour.map(u => ({ ...u, type: 'unit' })),
+                ...eventsStartingInHour.map(e => ({ ...e, type: 'event' }))
+              ];
+
+              // Sort by start time, then by duration (longer tasks first to establish parent hierarchy)
+              allItems.sort((a, b) => {
+                const aStart = new Date(a.type === 'unit' ? a.scheduledStart : a.start).getTime();
+                const bStart = new Date(b.type === 'unit' ? b.scheduledStart : b.start).getTime();
+                
+                if (aStart !== bStart) {
+                  return aStart - bStart; // Earlier start time first
+                }
+                
+                // If same start time, longer duration first (parent before children)
+                const aEnd = new Date(a.type === 'unit' ? a.scheduledEnd : a.end).getTime();
+                const bEnd = new Date(b.type === 'unit' ? b.scheduledEnd : b.end).getTime();
+                const aDuration = aEnd - aStart;
+                const bDuration = bEnd - bStart;
+                return bDuration - aDuration;
+              });
+
+              // Calculate nesting levels for each item
+              const itemsWithNesting = [];
+              
+              for (let i = 0; i < allItems.length; i++) {
+                const item = allItems[i];
+                let nestLevel = 0;
+                let parentIndex = -1;
+                
+                const itemStart = item.type === 'unit' ? item.scheduledStart : item.start;
+                const itemEnd = item.type === 'unit' ? item.scheduledEnd : item.end;
+                
+                // Find the most immediate parent (last item that contains this one)
+                for (let j = i - 1; j >= 0; j--) {
+                  const potentialParent = itemsWithNesting[j];
+                  const parentStart = potentialParent.type === 'unit' ? potentialParent.scheduledStart : potentialParent.start;
+                  const parentEnd = potentialParent.type === 'unit' ? potentialParent.scheduledEnd : potentialParent.end;
+                  
+                  if (isNestedWithin(itemStart, itemEnd, parentStart, parentEnd)) {
+                    nestLevel = potentialParent.nestLevel + 1;
+                    parentIndex = j;
+                    break; // Found immediate parent
+                  }
+                }
+                
+                itemsWithNesting.push({
+                  ...item,
+                  nestLevel,
+                  parentIndex
+                });
+              }
+
               return (
-                <Box key={hour} sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', minHeight: '60px' }}>
+                <Box key={hour} sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', minHeight: '60px', position: 'relative' }}>
                   <Box sx={{ width: '80px', p: 1, borderRight: '1px solid #e0e0e0', flexShrink: 0 }}>
                     <Typography variant="body2" color="text.secondary">
                       {format(new Date().setHours(hour, 0, 0, 0), 'h:mm a')}
                     </Typography>
                   </Box>
-                  <Box sx={{ flex: 1, p: 1 }}>
-                    {hourUnits.map((unit) => (
-                      <Card
-                        key={unit._id}
-                        sx={{
-                          mb: 0.5,
-                          p: 1,
-                          bgcolor: 'primary.light',
-                          cursor: 'pointer'
-                        }}
-                        onClick={() => handleOpenReschedule(unit)}
-                      >
-                        <Typography variant="body2" fontWeight="bold">
-                          {unit.goalId?.title || 'Unknown Goal'}
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          {format(new Date(unit.scheduledStart), 'h:mm a')} - {format(new Date(unit.scheduledEnd), 'h:mm a')}
-                        </Typography>
-                        <Chip
-                          label={unit.status}
-                          color={getStatusColor(unit.status)}
-                          size="small"
-                          sx={{ height: 18, fontSize: '0.65rem', mt: 0.5 }}
-                        />
-                      </Card>
-                    ))}
-                    {hourEvents.map((event) => (
-                      <Card
-                        key={event._id}
-                        sx={{
-                          mb: 0.5,
-                          p: 1,
-                          bgcolor: 'grey.300'
-                        }}
-                      >
-                        <Typography variant="body2" fontWeight="bold">
-                          {event.title}
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          {format(new Date(event.start), 'h:mm a')} - {format(new Date(event.end), 'h:mm a')}
-                        </Typography>
-                      </Card>
-                    ))}
+                  <Box sx={{ flex: 1, position: 'relative', minHeight: '60px' }}>
+                    {itemsWithNesting.map((item, idx) => {
+                      if (item.type === 'unit') {
+                        const blockStyle = getBlockStyle(item.scheduledStart, item.scheduledEnd, item.nestLevel);
+                        return (
+                          <Card
+                            key={item._id}
+                            sx={{
+                              ...blockStyle,
+                              p: 1,
+                              bgcolor: '#fef08a',
+                              cursor: 'pointer',
+                              border: item.nestLevel > 0 ? '1px solid #facc15' : 'none',
+                              boxShadow: item.nestLevel > 0 ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                              borderRadius: 1,
+                              zIndex: item.nestLevel + 1,
+                              '&:hover': {
+                                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                                bgcolor: '#fde047'
+                              }
+                            }}
+                            onClick={() => handleOpenReschedule(item)}
+                          >
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: '#000' }}>
+                              {item.goalId?.title || 'Unknown Goal'}
+                            </Typography>
+                            <Typography variant="caption" display="block" sx={{ color: '#000' }}>
+                              {format(new Date(item.scheduledStart), 'h:mm a')} - {format(new Date(item.scheduledEnd), 'h:mm a')}
+                            </Typography>
+                            <Chip
+                              label={item.status}
+                              color={getStatusColor(item.status)}
+                              size="small"
+                              sx={{ height: 18, fontSize: '0.65rem', mt: 0.5 }}
+                            />
+                          </Card>
+                        );
+                      } else {
+                        const blockStyle = getBlockStyle(item.start, item.end, item.nestLevel);
+                        return (
+                          <Card
+                            key={item._id}
+                            sx={{
+                              ...blockStyle,
+                              p: 1,
+                              bgcolor: '#38bdf8',
+                              border: item.nestLevel > 0 ? '1px solid #0ea5e9' : 'none',
+                              boxShadow: item.nestLevel > 0 ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                              borderRadius: 1,
+                              zIndex: item.nestLevel + 1
+                            }}
+                          >
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: '#fff' }}>
+                              {item.title}
+                            </Typography>
+                            <Typography variant="caption" display="block" sx={{ color: '#fff' }}>
+                              {format(new Date(item.start), 'h:mm a')} - {format(new Date(item.end), 'h:mm a')}
+                            </Typography>
+                          </Card>
+                        );
+                      }
+                    })}
                   </Box>
                 </Box>
               );
